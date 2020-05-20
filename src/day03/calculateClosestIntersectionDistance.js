@@ -5,9 +5,11 @@ const isDirectionHorizontal = (direction) => direction === "L" || direction === 
 const isDirectionPositive = (direction) => direction === "U" || direction === "R";
 
 function getPointsOnPath(path) {
-  const points = new Set();
+  const pointToStep = new Map();
 
   let lastKnownLocation = { x: 0, y: 0 };
+  let lastStep = 0;
+
   path.forEach((instruction) => {
     const direction = instruction[0];
     const distance = +instruction.slice(1);
@@ -19,23 +21,29 @@ function getPointsOnPath(path) {
 
     for (let step = 1; step <= distance; step++) {
       const nextLocation = takeStep(step);
-      points.add(`${nextLocation.x},${nextLocation.y}`);
+      const pointKey = `${nextLocation.x},${nextLocation.y}`;
+
+      if (!pointToStep.has(pointKey)) {
+        pointToStep.set(pointKey, lastStep + step);
+      }
     }
 
     lastKnownLocation = takeStep(distance);
+    lastStep += distance;
   });
 
-  return points;
+  return pointToStep;
 }
 
 module.exports = function calculateClosestIntersectionDistance(paths) {
-  const points = paths.map((path) => path.split(",")).map(getPointsOnPath);
+  const pointsToSteps = paths.map((path) => path.split(",")).map(getPointsOnPath);
 
-  const intersections = points.reduce((previousIntersection, pointSet) => {
-    const nextIntersection = new Set();
-    for (const point of pointSet) {
+  const intersections = pointsToSteps.reduce((previousIntersection, pointToStep) => {
+    const nextIntersection = new Map();
+
+    for (const point of pointToStep.keys()) {
       if (previousIntersection.has(point)) {
-        nextIntersection.add(point);
+        nextIntersection.set(point, previousIntersection.get(point) + pointToStep.get(point));
       }
     }
 
@@ -46,10 +54,5 @@ module.exports = function calculateClosestIntersectionDistance(paths) {
     throw new Error("No intersections");
   }
 
-  return Math.min(
-    ...Array.from(intersections.values()).map((intersection) => {
-      const [x, y] = intersection.split(",");
-      return Math.abs(+x) + Math.abs(+y);
-    })
-  );
+  return Math.min(...Array.from(intersections.values()));
 };
